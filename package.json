@@ -1,0 +1,17 @@
+{
+  "name": "ipfs-eth-bridge",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "datastore-ipfs-http-api": "github:kumavis/js-datastore-ipfs-http-api",
+    "interface-datastore": "^0.2.0",
+    "ipfs": "^0.23.1",
+    "ipfs-repo": "^0.13.0"
+  }
+}
