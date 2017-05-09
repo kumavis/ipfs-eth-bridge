@@ -1,11 +1,14 @@
 const IPFS = require('ipfs')
 const Repo = require('ipfs-repo')
-const RemoteIpfsDataStore = require('datastore-ipfs-http-api')
+const HookedDataStore = require('datastore-ipfs-ro-hook')
 const Key = require('interface-datastore').Key
+const ConcatStream = require('concat-stream')
+const http = require('http')
 
 const ETH_PROTOCOL = process.env.ETH_PROTOCOL || 'http'
 const ETH_HOST = process.env.ETH_HOST || 'localhost'
 const ETH_PORT = process.env.ETH_PORT || '5001'
+const uriBase = `${ETH_PROTOCOL}://${ETH_HOST}:${ETH_PORT}/api/v0/block/get?arg=`
 
 const repo = new Repo('./ipfs-repo')
 const node = new IPFS({
@@ -18,17 +21,22 @@ node.on('ready', () => {
   console.log(`Mounting Parity as data store: ${ETH_PROTOCOL}://${ETH_HOST}:${ETH_PORT}`)
   const dataStoreMount = {
     prefix: new Key('/blocks/'),
-    datastore: new RemoteIpfsDataStore({
-      protocol: ETH_PROTOCOL,
-      host: ETH_HOST,
-      port: ETH_PORT,
-    })
+    datastore: new HookedDataStore(fetchByCid)
   }
   repo.store.mounts.unshift(dataStoreMount)
-  // repo.store.mounts.splice(1, 0, dataStoreMount)
-  // console.log(repo.store.mounts)
   setupHttpApi()
 })
+
+function fetchByCid(cid, cb) {
+  const cidString = cid.toBaseEncodedString()
+  const uri = uriBase + cidString
+  http.get(uri, (res) => {
+    res.pipe(ConcatStream((result) => {
+      cb(null, result)
+    }))
+    res.once('error', cb)
+  })
+}
 
 // Events
 
