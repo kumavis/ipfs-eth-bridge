@@ -1,5 +1,6 @@
 const IPFS = require('ipfs')
 const Repo = require('ipfs-repo')
+const mh = require('multihashes')
 const HookedDataStore = require('datastore-ipfs-ro-hook')
 const Key = require('interface-datastore').Key
 const ConcatStream = require('concat-stream')
@@ -28,6 +29,9 @@ node.on('ready', () => {
 })
 
 function fetchByCid(cid, cb) {
+  // filter for valid ethereum hashes
+  if (mh.decode(cid.multihash).name !== 'keccak-256') return cb(new Error('Parity fetch failed - unsupported hash type'))
+  // continue fetching
   const cidString = cid.toBaseEncodedString()
   const uri = uriBase + cidString
   http.get(uri, (res) => {

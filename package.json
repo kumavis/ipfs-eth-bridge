@@ -13,6 +13,7 @@
     "datastore-ipfs-ro-hook": "^1.0.1",
     "interface-datastore": "^0.2.0",
     "ipfs": "^0.23.1",
-    "ipfs-repo": "^0.13.0"
+    "ipfs-repo": "^0.13.0",
+    "multihashes": "^0.4.5"
   }
 }
