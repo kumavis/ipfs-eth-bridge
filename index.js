@@ -32,6 +32,7 @@ function fetchByCid(cid, cb) {
   const uri = uriBase + cidString
   http.get(uri, (res) => {
     res.pipe(ConcatStream((result) => {
+      if (res.statusCode !== 200) return cb(new Error(`Parity fetch failed - ${res.statusCode} - ${result}`))
       cb(null, result)
     }))
     res.once('error', cb)
@@ -117,13 +118,29 @@ class HttpApiServer {
 
           // select which connection with server.select(<label>) to add routes
           this.server.connection({
-            host: api[2],
+            // host: api[2],
+            // host: '0.0.0.0',
             port: api[4],
             labels: 'API'
           })
 
           this.server.connection({
-            host: gateway[2],
+            // host: gateway[2],
+            // host: '0.0.0.0',
+            port: gateway[4],
+            labels: 'Gateway'
+          })
+
+          // log connection details
+          console.log({
+            // host: api[2],
+            // host: '0.0.0.0',
+            port: api[4],
+            labels: 'API'
+          })
+          console.log({
+            // host: gateway[2],
+            // host: '0.0.0.0',
             port: gateway[4],
             labels: 'Gateway'
           })

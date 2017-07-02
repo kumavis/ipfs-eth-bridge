@@ -5,13 +5,13 @@ ipld-eth-bridge:
     - "4002:4002"
     - "4003:4003"
     - "5002:5002"
-    - "9090"
+    - "9090:9090"
   links:
     - parity
   environment:
     ETH_HOST: "parity"
     ETH_PORT: "5050"
-    VIRTUAL_PORT: "9090"
+    VIRTUAL_PORT: "5002"
     VIRTUAL_HOST: "ipfs.lab.metamask.io"
     LETSENCRYPT_HOST: "ipfs.lab.metamask.io"
     LETSENCRYPT_EMAIL: "admin@metamask.io"
@@ -20,7 +20,7 @@ parity:
   image: ethcore/parity:master
   ports:
     - "3000:3000"
-    - "5050"
+    - "5050:5050"
   volumes:
     - /var/data/parity/:/var/data
   command: "-d /var/data/ --ipfs-api --ipfs-api-port 5050 --ipfs-api-hosts all --ipfs-api-interface 0.0.0.0"
