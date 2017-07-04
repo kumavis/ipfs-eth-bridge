@@ -11,7 +11,7 @@ ipld-eth-bridge:
   environment:
     ETH_HOST: "parity"
     ETH_PORT: "5050"
-    VIRTUAL_PORT: "5002"
+    VIRTUAL_PORT: "4003"
     VIRTUAL_HOST: "ipfs.lab.metamask.io"
     LETSENCRYPT_HOST: "ipfs.lab.metamask.io"
     LETSENCRYPT_EMAIL: "admin@metamask.io"
