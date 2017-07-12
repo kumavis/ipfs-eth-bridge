@@ -1,5 +1,6 @@
 const IPFS = require('ipfs')
 const Repo = require('ipfs-repo')
+const CID = require('cids')
 const mh = require('multihashes')
 const HookedDataStore = require('datastore-ipfs-ro-hook')
 const Key = require('interface-datastore').Key
