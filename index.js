@@ -32,7 +32,9 @@ function fetchByCid(cid, cb) {
   // filter for valid ethereum hashes
   if (mh.decode(cid.multihash).name !== 'keccak-256') return cb(new Error('Parity fetch failed - unsupported hash type'))
   // continue fetching
-  const cidString = cid.toBaseEncodedString()
+  // hot fix for https://github.com/paritytech/parity/issues/4172#issuecomment-314722992
+  const fixedCid = (cid.codec !== 'eth-storage-trie') ? cid : new CID(cid.version, 'eth-state-trie', cid.multihash)
+  const cidString = fixedCid.toBaseEncodedString()
   const uri = uriBase + cidString
   http.get(uri, (res) => {
     res.pipe(ConcatStream((result) => {
