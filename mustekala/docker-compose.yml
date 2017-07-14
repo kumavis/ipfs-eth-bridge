@@ -1,5 +1,5 @@
 nginx-proxy:
-  image: jwilder/nginx-proxy
+  build: ./nginx-proxy/.
   container_name: nginx-proxy
   restart: always
   ports:
