@@ -62,4 +62,5 @@ parity:
     - "30303:30303"
   volumes:
     - /home/core/parity-data:/parity-data
-  command: "--datadir /parity-data --reserved-peers /parity-data/reserved-peers.txt --ipfs-api --ipfs-api-port 5001 --ipfs-api-hosts all --ipfs-api-interface 0.0.0.0 --cache 8192 --pruning archive"
+    - /home/core/peers:/parity-peers
+  command: "--datadir /parity-data --reserved-peers /parity-peers/eth-rlpx.txt --ipfs-api --ipfs-api-port 5001 --ipfs-api-hosts all --ipfs-api-interface 0.0.0.0 --cache 8192 --pruning archive"
