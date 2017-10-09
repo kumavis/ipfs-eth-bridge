@@ -17,7 +17,7 @@ ipld-eth-bridge:
     LETSENCRYPT_EMAIL: "admin@metamask.io"
 
 parity:
-  image: ethcore/parity:master
+  image: parity/parity:stable
   ports:
     - "3000:3000"
     - "5050:5050"
