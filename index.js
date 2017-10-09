@@ -1,11 +1,14 @@
-const async = require('async/series')
+const waterfall = require('async/waterfall')
 const IPFS = require('ipfs')
 const Repo = require('ipfs-repo')
 const CID = require('cids')
 const mh = require('multihashes')
-const MountStore = require('datastore-core/src/mount')
+const MountDatastore = require('datastore-core/src/mount')
+const Shard = require('datastore-core').shard
+const ShardingStore = require('datastore-core').ShardingDatastore
 const HookedDataStore = require('datastore-ipfs-ro-hook')
 const Key = require('interface-datastore').Key
+const MemoryStore = require('interface-datastore').MemoryDatastore
 const ConcatStream = require('concat-stream')
 const http = require('http')
 
@@ -15,37 +18,82 @@ const ETH_PORT = process.env.ETH_PORT || '5001'
 const uriBase = `${ETH_PROTOCOL}://${ETH_HOST}:${ETH_PORT}/api/v0/block/get?arg=`
 
 console.log(`Mounting Parity as data store: ${ETH_PROTOCOL}://${ETH_HOST}:${ETH_PORT}`)
-const dataStoreMount = {
-  prefix: new Key('/blocks/'),
-  datastore: new HookedDataStore(fetchByCid)
-}
-class CustomDatastore extends MountStore {
-  constructor () {
-    super([dataStoreMount])
+
+class PatchedMountDatastore extends MountDatastore {
+  put (key /* : Key */, value /* : Value */, callback /* : Callback<void> */) /* : void */ {
+    const match = this._lookup(key)
+    if (match == null) {
+      callback(new Error(`No datastore mounted for this key "${key}"`))
+      return
+    }
+
+    match.datastore.put(match.rest, value, callback)
   }
 }
-const repo = new Repo('./ipfs-repo', {
-  storageBackends: {
-    blocks: CustomDatastore,
-  },
-})
-const node = new IPFS({
-  repo: repo,
-  start: true,
-  sharding: false,
-})
 
-node.on('ready', setupHttpApi)
-node.on('error', (err) => {
-  throw err
-}) // Node has hit some error while initing/starting
+// const childStore = new HookedDataStore(noopRead)
 
-node.on('init', () => console.log('ipfs node init'))     // Node has successfully finished initing the repo
-node.on('start', () => console.log('ipfs node start'))    // Node has started
-node.on('stop', () => console.log('ipfs node stop'))     // Node has stopped
+waterfall([
+  (cb) => prepareCustomDatastore(cb),
+  (CustomDatastore, cb) => prepareIpfs(CustomDatastore, cb),
+  (node, cb) => setupHttpApi(node)
+])
+
+function prepareCustomDatastore(cb) {
+  const shard = new Shard.NextToLast(2)
+  ShardingStore.createOrOpen(new MemoryStore(), shard, (err, store) => {
+    // sharding store (?)
+    const shardingStoreMount = {
+      prefix: new Key('/SHARDING'),
+      datastore: store
+    }
+    // README store
+    const readmeMount = {
+      prefix: new Key('/_README'),
+      datastore: new MemoryStore()
+    }
+    // hooked blockstore
+    const dataStoreMount = {
+      prefix: new Key('/blocks'),
+      datastore: new HookedDataStore(fetchByCid)
+    }
+    // custom class bc of Array-options type
+    class CustomDatastore extends PatchedMountDatastore {
+      constructor () {
+        super([dataStoreMount, shardingStoreMount, readmeMount])
+      }
+    }
+    cb(null, CustomDatastore)
+  })
+}
+
+function prepareIpfs(CustomDatastore, cb) {
+
+  const repo = new Repo('./ipfs-repo', {
+    storageBackends: {
+      blocks: CustomDatastore,
+    },
+  })
+  const node = new IPFS({
+    repo: repo,
+    start: true,
+    sharding: false,
+  })
+
+  node.once('ready', () => cb(null, node))
+  node.on('error', (err) => {
+    console.error(err)
+  }) // Node has hit some error while initing/starting
+  node.on('ready', () => console.log('ipfs node ready'))     // Node has successfully finished initing the repo
+  node.on('init', () => console.log('ipfs node init'))     // Node has successfully finished initing the repo
+  node.on('start', () => console.log('ipfs node start'))    // Node has started
+  node.on('stop', () => console.log('ipfs node stop'))     // Node has stopped
+}
+
 
 function fetchByCid(cid, cb) {
   // filter for valid ethereum hashes
+  console.log('fetchByCid', cid, cb)
   if (mh.decode(cid.multihash).name !== 'keccak-256') return cb(new Error('Parity fetch failed - unsupported hash type'))
   // continue fetching
   // hot fix for https://github.com/paritytech/parity/issues/4172#issuecomment-314722992
@@ -61,17 +109,11 @@ function fetchByCid(cid, cb) {
   })
 }
 
-// Events
+function noopRead(cid, cb) {
+  cb()
+}
 
-// node.on('ready', () => console.log('ready'))    // Node is ready to use when you first create it
-// node.on('error', () => console.log('error')) // Node has hit some error while initing/starting
-
-// node.on('init', () => console.log('init'))     // Node has successfully finished initing the repo
-// node.on('start', () => console.log('start'))    // Node has started
-// node.on('stop', () => console.log('stop'))     // Node has stopped
-
-
-function setupHttpApi() {
+function setupHttpApi(node) {
   // const HttpAPI = require('ipfs/src/http')
   console.log('Starting http server....')
   httpAPI = new HttpApiServer(node)
@@ -133,7 +175,11 @@ class HttpApiServer {
 
           // CORS is enabled by default
           this.server = new Hapi.Server({
-            connections: { routes: { cors: true } }
+            connections: { routes: { cors: true } },
+            debug: {
+              log: '*',
+              request: ['received'],
+            },
           })
 
           this.server.app.ipfs = this.node
