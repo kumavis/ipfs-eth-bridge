@@ -14,30 +14,25 @@ const ETH_HOST = process.env.ETH_HOST || 'localhost'
 const ETH_PORT = process.env.ETH_PORT || '5001'
 const uriBase = `${ETH_PROTOCOL}://${ETH_HOST}:${ETH_PORT}/api/v0/block/get?arg=`
 
-const repo = new Repo('./ipfs-repo')
+console.log(`Mounting Parity as data store: ${ETH_PROTOCOL}://${ETH_HOST}:${ETH_PORT}`)
+const dataStoreMount = {
+  prefix: new Key('/blocks/'),
+  datastore: new HookedDataStore(fetchByCid)
+}
+const repo = new Repo('./ipfs-repo', {
+  storageBackends: {
+    blocks: MountStore,
+  },
+  storageBackendOptions: {
+    blocks: [dataStoreMount],
+  }
+})
 const node = new IPFS({
   repo: repo,
   start: true,
 })
 
-node.on('ready', () => {
-  // hacky late add to MountStore
-  console.log(`Mounting Parity as data store: ${ETH_PROTOCOL}://${ETH_HOST}:${ETH_PORT}`)
-  const dataStoreMount = {
-    prefix: new Key('/blocks/'),
-    datastore: new HookedDataStore(fetchByCid)
-  }
-  const blocksBaseStore = new MountStore([dataStoreMount])
-  series([
-    (cb) => blockstore(blocksBaseStore, {}, cb),
-    (blocks, cb) => {
-      // overwrite blockstore
-      repo.blocks = blocks
-      cb()
-    },
-    setupHttpApi,
-  ])
-})
+node.on('ready', setupHttpApi)
 
 function fetchByCid(cid, cb) {
   // filter for valid ethereum hashes
