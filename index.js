@@ -19,20 +19,30 @@ const dataStoreMount = {
   prefix: new Key('/blocks/'),
   datastore: new HookedDataStore(fetchByCid)
 }
+class CustomDatastore extends MountStore {
+  constructor () {
+    super([dataStoreMount])
+  }
+}
 const repo = new Repo('./ipfs-repo', {
   storageBackends: {
-    blocks: MountStore,
+    blocks: CustomDatastore,
   },
-  storageBackendOptions: {
-    blocks: [dataStoreMount],
-  }
 })
 const node = new IPFS({
   repo: repo,
   start: true,
+  sharding: false,
 })
 
 node.on('ready', setupHttpApi)
+node.on('error', (err) => {
+  throw err
+}) // Node has hit some error while initing/starting
+
+node.on('init', () => console.log('ipfs node init'))     // Node has successfully finished initing the repo
+node.on('start', () => console.log('ipfs node start'))    // Node has started
+node.on('stop', () => console.log('ipfs node stop'))     // Node has stopped
 
 function fetchByCid(cid, cb) {
   // filter for valid ethereum hashes
@@ -63,8 +73,10 @@ function fetchByCid(cid, cb) {
 
 function setupHttpApi() {
   // const HttpAPI = require('ipfs/src/http')
+  console.log('Starting http server....')
   httpAPI = new HttpApiServer(node)
   httpAPI.start((err) => {
+    console.log('http server is up!')
     if (err && err.code === 'ENOENT') {
       console.log('Error: no ipfs repo found in ' + repoPath)
       console.log('please run: jsipfs init')
