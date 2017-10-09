@@ -57,7 +57,7 @@ function fetchByCid(cid, cb) {
 
 
 function setupHttpApi() {
-  // const HttpAPI = require('ipfs/src/http-api')
+  // const HttpAPI = require('ipfs/src/http')
   httpAPI = new HttpApiServer(node)
   httpAPI.start((err) => {
     if (err && err.code === 'ENOENT') {
@@ -88,7 +88,7 @@ function setupHttpApi() {
 
 const series = require('async/series')
 const Hapi = require('hapi')
-const errorHandler = require('ipfs/src/http-api/error-handler')
+const errorHandler = require('ipfs/src/http/error-handler')
 const multiaddr = require('multiaddr')
 const setHeader = require('hapi-set-header')
 
@@ -157,7 +157,8 @@ class HttpApiServer {
 
           // load routes
           // require('./routes')(this.server)
-          require('ipfs/src/http-api/routes')(this.server)
+          require('ipfs/src/http/api/routes')(this.server)
+          require('ipfs/src/http/gateway/routes')(this.server)
 
           // Set default headers
           setHeader(this.server,
@@ -181,7 +182,7 @@ class HttpApiServer {
         this.log('Gateway (readonly) is listening on: %s', gateway.info.ma)
 
         // for the CLI to know the where abouts of the API
-        this.node._repo.setApiAddress(api.info.ma, cb)
+        this.node._repo.apiAddr.set(api.info.ma, cb)
       }
     ], cb)
 
