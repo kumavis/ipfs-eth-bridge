@@ -1,7 +1,9 @@
+const async = require('async/series')
 const IPFS = require('ipfs')
 const Repo = require('ipfs-repo')
 const CID = require('cids')
 const mh = require('multihashes')
+const MountStore = require('datastore-core/src/mount')
 const HookedDataStore = require('datastore-ipfs-ro-hook')
 const Key = require('interface-datastore').Key
 const ConcatStream = require('concat-stream')
@@ -25,8 +27,16 @@ node.on('ready', () => {
     prefix: new Key('/blocks/'),
     datastore: new HookedDataStore(fetchByCid)
   }
-  repo.store.mounts.unshift(dataStoreMount)
-  setupHttpApi()
+  const blocksBaseStore = new MountStore([dataStoreMount])
+  series([
+    (cb) => blockstore(blocksBaseStore, {}, cb),
+    (blocks, cb) => {
+      // overwrite blockstore
+      repo.blocks = blocks
+      cb()
+    },
+    setupHttpApi,
+  ])
 })
 
 function fetchByCid(cid, cb) {

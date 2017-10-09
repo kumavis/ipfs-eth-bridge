@@ -9,8 +9,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "async": "^2.5.0",
     "cids": "^0.5.1",
     "concat-stream": "^1.6.0",
+    "datastore-core": "^0.3.0",
     "datastore-ipfs-ro-hook": "^1.0.1",
     "interface-datastore": "^0.2.0",
     "ipfs": "^0.26.0",
