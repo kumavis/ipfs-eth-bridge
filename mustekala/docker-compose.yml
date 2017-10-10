@@ -52,7 +52,7 @@ ipld-eth-bridge:
     LETSENCRYPT_EMAIL: "admin@musteka.la"
 
 parity:
-  image: parity/parity:v1.6.8
+  image: parity/parity:stable
   container_name: parity
   restart: always
   ports:
