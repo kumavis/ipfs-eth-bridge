@@ -2,15 +2,11 @@ const waterfall = require('async/waterfall')
 const IPFS = require('ipfs')
 const Repo = require('ipfs-repo')
 const CID = require('cids')
+const base32 = require('base32.js')
 const mh = require('multihashes')
-const MountDatastore = require('datastore-core/src/mount')
-const Shard = require('datastore-core').shard
-const ShardingStore = require('datastore-core').ShardingDatastore
-const HookedDataStore = require('datastore-ipfs-ro-hook')
-const Key = require('interface-datastore').Key
-const MemoryStore = require('interface-datastore').MemoryDatastore
 const ConcatStream = require('concat-stream')
 const http = require('http')
+const FsStore = require('datastore-fs')
 
 const ETH_PROTOCOL = process.env.ETH_PROTOCOL || 'http'
 const ETH_HOST = process.env.ETH_HOST || 'localhost'
@@ -19,65 +15,63 @@ const uriBase = `${ETH_PROTOCOL}://${ETH_HOST}:${ETH_PORT}/api/v0/block/get?arg=
 
 console.log(`Mounting Parity as data store: ${ETH_PROTOCOL}://${ETH_HOST}:${ETH_PORT}`)
 
-class PatchedMountDatastore extends MountDatastore {
-  put (key /* : Key */, value /* : Value */, callback /* : Callback<void> */) /* : void */ {
-    const match = this._lookup(key)
-    if (match == null) {
-      callback(new Error(`No datastore mounted for this key "${key}"`))
-      return
-    }
-
-    match.datastore.put(match.rest, value, callback)
+class CustomFsStore extends FsStore {
+  get (key, cb) {
+    // console.log('CustomFsStore - get', arguments)
+    const cid = interceptEthCid(key)
+    if (!cid) return super.get.apply(this, arguments)
+    fetchByCid(cid, cb)
+  }
+  has (key, cb) {
+    // console.log('CustomFsStore - has', arguments)
+    // console.log('CustomFsStore - has', key.toString())
+    const cid = interceptEthCid(key)
+    if (!cid) return super.has.apply(this, arguments)
+    fetchByCid(cid, (err, result) => {
+      if (err) return cb(null, false)
+      cb(null, true)
+    })
   }
 }
 
-// const childStore = new HookedDataStore(noopRead)
+function interceptEthCid(key){
+  // console.log('interceptEthCid', key.toString())
+  const slug = key.toString()
+  if (['/SHARDING'].includes(slug)) return
+  const rawKey = slug.split('/')[2]
+  if (!rawKey) return
+  const cid = dsKeyToCid(rawKey)
+  // console.log(cid)
+  const isEth = cid.codec.includes('eth-') || cid.codec === 'raw'
+  if (!isEth) return
+  return cid
+}
+
+function dsKeyToCid(rawKey) {
+  // console.log('rawKey:', rawKey)
+  const decoder = new base32.Decoder()
+  const buf = decoder.write(rawKey).finalize()
+  // console.log('buf:', buf)
+  const cid = new CID(buf)
+  return cid
+}
 
 waterfall([
-  (cb) => prepareCustomDatastore(cb),
-  (CustomDatastore, cb) => prepareIpfs(CustomDatastore, cb),
+  (cb) => prepareIpfs(cb),
   (node, cb) => setupHttpApi(node)
 ])
 
-function prepareCustomDatastore(cb) {
-  const shard = new Shard.NextToLast(2)
-  ShardingStore.createOrOpen(new MemoryStore(), shard, (err, store) => {
-    // sharding store (?)
-    const shardingStoreMount = {
-      prefix: new Key('/SHARDING'),
-      datastore: store
-    }
-    // README store
-    const readmeMount = {
-      prefix: new Key('/_README'),
-      datastore: new MemoryStore()
-    }
-    // hooked blockstore
-    const dataStoreMount = {
-      prefix: new Key('/blocks'),
-      datastore: new HookedDataStore(fetchByCid)
-    }
-    // custom class bc of Array-options type
-    class CustomDatastore extends PatchedMountDatastore {
-      constructor () {
-        super([dataStoreMount, shardingStoreMount, readmeMount])
-      }
-    }
-    cb(null, CustomDatastore)
-  })
-}
-
-function prepareIpfs(CustomDatastore, cb) {
+function prepareIpfs(cb) {
 
   const repo = new Repo('./ipfs-repo', {
     storageBackends: {
-      blocks: CustomDatastore,
+      blocks: CustomFsStore,
     },
   })
   const node = new IPFS({
     repo: repo,
     start: true,
-    sharding: false,
+    Bootstrap: []
   })
 
   node.once('ready', () => cb(null, node))
@@ -93,7 +87,7 @@ function prepareIpfs(CustomDatastore, cb) {
 
 function fetchByCid(cid, cb) {
   // filter for valid ethereum hashes
-  console.log('fetchByCid', cid, cb)
+  console.log('fetchByCid', cid)
   if (mh.decode(cid.multihash).name !== 'keccak-256') return cb(new Error('Parity fetch failed - unsupported hash type'))
   // continue fetching
   // hot fix for https://github.com/paritytech/parity/issues/4172#issuecomment-314722992
