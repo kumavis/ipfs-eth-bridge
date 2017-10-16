@@ -87,7 +87,6 @@ function prepareIpfs(cb) {
 
 function fetchByCid(cid, cb) {
   // filter for valid ethereum hashes
-  console.log('fetchByCid', cid)
   if (mh.decode(cid.multihash).name !== 'keccak-256') return cb(new Error('Parity fetch failed - unsupported hash type'))
   // continue fetching
   // hot fix for https://github.com/paritytech/parity/issues/4172#issuecomment-314722992
