@@ -18,6 +18,7 @@ ipld-eth-bridge:
 
 parity:
   image: parity/parity:stable
+  restart: always
   ports:
     - "3000:3000"
     - "5050:5050"
